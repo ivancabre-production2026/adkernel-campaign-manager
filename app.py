@@ -26,165 +26,153 @@ st.set_page_config(
 # ── CSS ────────────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-  /* Global */
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
-  html, body, [class*="css"] {
-    font-family: 'Inter', sans-serif;
+  html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
+
+  /* App background */
+  .stApp { background: #f9fafb; }
+  .main .block-container {
+    padding-top: 1.75rem;
+    padding-bottom: 3rem;
+    max-width: 1280px;
   }
 
   /* Sidebar */
   [data-testid="stSidebar"] {
-    background: #0f1117;
-    border-right: 1px solid #1e2130;
+    background: #111827;
+    border-right: none;
   }
-  [data-testid="stSidebar"] * {
-    color: #c9d1d9 !important;
-  }
+  [data-testid="stSidebar"] * { color: #d1d5db !important; }
   [data-testid="stSidebar"] .stRadio label {
-    padding: 8px 12px;
-    border-radius: 6px;
-    transition: background 0.15s;
+    padding: 9px 14px;
+    border-radius: 8px;
+    transition: background 0.12s;
     display: block;
-    font-size: 0.875rem;
+    font-size: 0.85rem;
     font-weight: 500;
-    letter-spacing: 0.01em;
   }
-  [data-testid="stSidebar"] .stRadio label:hover {
-    background: #1e2130;
-  }
-
-  /* Main background */
-  .main .block-container {
-    padding-top: 2rem;
-    padding-bottom: 2rem;
-    max-width: 1200px;
+  [data-testid="stSidebar"] .stRadio label:hover { background: #1f2937; }
+  [data-testid="stSidebar"] [data-testid="stRadio"] input:checked + label {
+    background: #1f2937;
+    color: #fff !important;
   }
 
   /* Page title */
   h1 {
-    font-size: 1.5rem !important;
-    font-weight: 600 !important;
-    color: #0f1117 !important;
-    letter-spacing: -0.02em !important;
-    margin-bottom: 0.25rem !important;
+    font-size: 1.6rem !important;
+    font-weight: 700 !important;
+    color: #111827 !important;
+    letter-spacing: -0.03em !important;
+    margin-bottom: 0 !important;
+    line-height: 1.2 !important;
   }
 
-  /* Metric cards */
-  .metric-card {
-    background: #ffffff;
-    border: 1px solid #e8ecf0;
-    border-radius: 10px;
-    padding: 20px 24px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
-  }
-  .metric-label {
-    font-size: 0.75rem;
-    font-weight: 500;
-    color: #6b7280;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    margin-bottom: 8px;
-  }
-  .metric-value {
-    font-size: 2rem;
+  /* Section labels */
+  .section-label {
+    font-size: 0.7rem;
     font-weight: 700;
-    color: #0f1117;
-    line-height: 1;
-  }
-  .metric-value.green { color: #059669; }
-  .metric-value.amber { color: #d97706; }
-  .metric-value.red   { color: #dc2626; }
-
-  /* Status badges */
-  .badge {
-    display: inline-block;
-    padding: 2px 10px;
-    border-radius: 999px;
-    font-size: 0.72rem;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-  }
-  .badge-green  { background: #d1fae5; color: #065f46; }
-  .badge-gray   { background: #f3f4f6; color: #374151; }
-  .badge-amber  { background: #fef3c7; color: #92400e; }
-
-  /* Section header */
-  .section-header {
-    font-size: 0.8rem;
-    font-weight: 600;
-    color: #6b7280;
+    color: #9ca3af;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.1em;
     margin-bottom: 12px;
-    margin-top: 8px;
+    margin-top: 4px;
   }
 
   /* Log output */
   .log-box {
-    background: #0f1117;
-    color: #a8ff78;
-    font-family: 'SF Mono', 'Fira Code', monospace;
-    font-size: 0.78rem;
-    padding: 16px;
-    border-radius: 8px;
-    max-height: 320px;
+    background: #0d1117;
+    color: #7ee787;
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 0.76rem;
+    padding: 16px 20px;
+    border-radius: 10px;
+    max-height: 340px;
     overflow-y: auto;
-    line-height: 1.6;
+    line-height: 1.7;
+    border: 1px solid #21262d;
   }
 
-  /* Divider */
-  hr {
-    border: none;
-    border-top: 1px solid #e8ecf0;
-    margin: 1.5rem 0;
-  }
+  /* Dividers */
+  hr { border: none; border-top: 1px solid #e5e7eb; margin: 1.25rem 0; }
 
   /* Buttons */
   .stButton > button {
-    border-radius: 7px;
+    border-radius: 8px;
     font-weight: 500;
-    font-size: 0.875rem;
+    font-size: 0.85rem;
     letter-spacing: 0.01em;
-    transition: all 0.15s;
-    border: 1px solid #d1d5db;
+    transition: all 0.12s;
+    border: 1px solid #e5e7eb;
+    background: #fff;
+    color: #374151;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
   }
+  .stButton > button:hover { background: #f9fafb; border-color: #d1d5db; }
   .stButton > button[kind="primary"] {
-    background: #0f1117;
-    border-color: #0f1117;
-    color: white;
+    background: #111827;
+    border-color: #111827;
+    color: #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.15);
   }
-  .stButton > button[kind="primary"]:hover {
-    background: #1e2130;
-    border-color: #1e2130;
-  }
+  .stButton > button[kind="primary"]:hover { background: #1f2937; border-color: #1f2937; }
 
-  /* Form inputs */
+  /* Inputs */
   .stTextInput > div > div > input,
-  .stNumberInput > div > div > input,
-  .stSelectbox > div > div {
-    border-radius: 7px !important;
-    border-color: #d1d5db !important;
+  .stNumberInput > div > div > input {
+    border-radius: 8px !important;
+    border-color: #e5e7eb !important;
     font-size: 0.875rem !important;
+    background: #fff !important;
   }
+  .stSelectbox > div > div { border-radius: 8px !important; border-color: #e5e7eb !important; }
 
   /* Dataframe */
   [data-testid="stDataFrame"] {
-    border: 1px solid #e8ecf0;
-    border-radius: 10px;
+    border: 1px solid #e5e7eb !important;
+    border-radius: 12px !important;
     overflow: hidden;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.05);
   }
 
-  /* Form container */
+  /* Form */
   [data-testid="stForm"] {
-    background: #ffffff;
-    border: 1px solid #e8ecf0;
-    border-radius: 10px;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
     padding: 24px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
   }
 
-  /* Hide Streamlit branding */
+  /* Expanders */
+  [data-testid="stExpander"] {
+    border: 1px solid #e5e7eb !important;
+    border-radius: 10px !important;
+    background: #fff !important;
+  }
+
+  /* Tabs */
+  .stTabs [data-baseweb="tab-list"] {
+    background: #f3f4f6;
+    border-radius: 10px;
+    padding: 4px;
+    gap: 2px;
+  }
+  .stTabs [data-baseweb="tab"] {
+    border-radius: 7px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    padding: 7px 16px;
+  }
+  .stTabs [aria-selected="true"] {
+    background: #fff !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+
+  /* Chat */
+  [data-testid="stChatMessageContent"] { font-size: 0.9rem; }
+
+  /* Hide branding */
   #MainMenu, footer, header { visibility: hidden; }
 </style>
 """, unsafe_allow_html=True)
@@ -239,15 +227,6 @@ def load_created() -> dict:
     return {}
 
 
-def metric_card(label: str, value, color: str = "") -> str:
-    cls = f"metric-value {color}".strip()
-    return f"""
-    <div class="metric-card">
-      <div class="metric-label">{label}</div>
-      <div class="{cls}">{value}</div>
-    </div>"""
-
-
 # ── Sidebar ────────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("""
@@ -269,25 +248,80 @@ with st.sidebar:
     ], label_visibility="collapsed")
 
 
+# ── AdKernel Offer Stats ───────────────────────────────────────────────────────
+@st.cache_data(ttl=300, show_spinner=False)
+def ak_get_offer_stats(_tok: str, date_param: str) -> dict:
+    """Devuelve {offer_id: row} desde AdvertiserReports/offer. Incluye cost, revenue, profit, ROI, conversions."""
+    try:
+        r = requests.get(f"{AK_BASE}/admin/api/AdvertiserReports/offer",
+            params={"version": AK_VERSION, "token": _tok,
+                    "ad_campaign_id": AK_CAMPAIGN_ID,
+                    "date": date_param, "limit": 200},
+            timeout=30)
+        data = r.json()
+        if data.get("status") != "OK":
+            return {}
+        rows = data["response"]["list"]["rows"]
+        total = data["response"].get("total", {})
+        result = {}
+        for row in rows.values():
+            oid = row.get("offer_id")
+            if oid:
+                result[int(oid)] = row
+        result["__total__"] = total
+        return result
+    except Exception:
+        return {}
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # DASHBOARD
 # ══════════════════════════════════════════════════════════════════════════════
 if page == "Dashboard":
     import datetime
 
-    # ── Fetch data ─────────────────────────────────────────────────────────
-    col_ref, col_range, _ = st.columns([1, 2, 4])
-    with col_ref:
-        if st.button("↺  Actualizar"):
+    # ── Header ─────────────────────────────────────────────────────────────
+    hcol1, hcol2 = st.columns([5, 1])
+    with hcol1:
+        st.markdown("<h1>Dashboard</h1>", unsafe_allow_html=True)
+    with hcol2:
+        st.markdown('<div style="height:8px"></div>', unsafe_allow_html=True)
+        if st.button("↺ Actualizar", use_container_width=True):
             st.cache_data.clear()
             st.rerun()
-    with col_range:
-        date_range = st.selectbox("Período", ["Hoy", "Últimos 7 días", "Últimos 30 días"],
-                                   index=2, label_visibility="collapsed")
 
-    SPEND_ALERT = 30.0   # alerta si una offer gasta más de este $ sin conversiones
+    # Period selector
+    p_col1, p_col2, p_col3, _ = st.columns([1, 1, 1, 4])
+    with p_col1:
+        p_hoy = st.button("Hoy", use_container_width=True,
+                           type="primary" if st.session_state.get("period") == "today" else "secondary")
+    with p_col2:
+        p_7d  = st.button("7 días", use_container_width=True,
+                           type="primary" if st.session_state.get("period") == "7d" else "secondary")
+    with p_col3:
+        p_30d = st.button("30 días", use_container_width=True,
+                           type="primary" if st.session_state.get("period", "30d") == "30d" else "secondary")
 
-    with st.spinner("Cargando datos..."):
+    if p_hoy: st.session_state["period"] = "today"
+    elif p_7d: st.session_state["period"] = "7d"
+    elif p_30d: st.session_state["period"] = "30d"
+    period = st.session_state.get("period", "30d")
+
+    today = datetime.date.today()
+    if period == "today":
+        date_param   = f"{today}_{today}"
+        period_label = "Hoy"
+    elif period == "7d":
+        date_param   = f"{today - datetime.timedelta(days=6)}_{today}"
+        period_label = "Últimos 7 días"
+    else:
+        date_param   = f"{today - datetime.timedelta(days=29)}_{today}"
+        period_label = "Últimos 30 días"
+
+    SPEND_ALERT = 20.0
+
+    # ── Load data ───────────────────────────────────────────────────────────
+    with st.spinner(""):
         try:
             tok    = ak_get_token()
             offers = ak_get_offers(tok)
@@ -295,207 +329,158 @@ if page == "Dashboard":
             st.error(f"No se pudo conectar a AdKernel: {e}")
             st.stop()
 
-    # ── Fetch AdKernel stats (clicks/cost per offer via API) ────────────────
-    @st.cache_data(ttl=180, show_spinner=False)
-    def ak_get_stats(_tok: str) -> dict:
-        """Devuelve {offer_id: {clicks, cost, impressions}} desde AdKernel."""
-        try:
-            now   = datetime.date.today()
-            start = now - datetime.timedelta(days=29)
-            r = requests.get(f"{AK_BASE}/admin/api/Stat/",
-                params={"version": AK_VERSION, "token": _tok,
-                        "ad_campaign_id": AK_CAMPAIGN_ID,
-                        "date_from": str(start), "date_to": str(now),
-                        "group_by": "offer", "limit": 500},
-                timeout=30)
-            rows = r.json().get("response", {}).get("rows", {})
-            return {int(k): v for k, v in rows.items()}
-        except Exception:
-            return {}
-
-    @st.cache_data(ttl=300, show_spinner=False)
-    def binom_get_stats(_key: str) -> list:
-        """Devuelve stats de campañas desde Binom."""
-        try:
-            r = requests.post("https://ilatintrack.biz/public/api/v1/click.stat",
-                headers={"Api-Key": _key},
-                json={"group1": "campaign_name", "date": "last_30_days"},
-                timeout=45)
-            if r.ok:
-                return r.json() if r.text else []
-        except Exception:
-            pass
-        return []
-
-    stats    = ak_get_stats(tok)
-    binom_st = binom_get_stats(BINOM_KEY)
-    binom_api_ok = bool(binom_st)
-    binom_map = {}
-    for row in binom_st:
-        name = row.get("name", "")
-        binom_map[name] = row
-
-    # Si el API de Binom falló, usar datos ingresados manualmente
-    manual_binom = load_binom_manual()
-    if not binom_api_ok and manual_binom:
-        binom_map = {k: v for k, v in manual_binom.items()}
+    offer_stats = ak_get_offer_stats(tok, date_param)
+    total_row   = offer_stats.pop("__total__", {})
 
     active   = [o for o in offers if o.get("is_active")]
     inactive = [o for o in offers if not o.get("is_active")]
 
-    # ── Aggregate totals ────────────────────────────────────────────────────
-    total_clicks = sum(s.get("clicks", 0) for s in stats.values())
-    total_cost   = sum(float(s.get("cost", 0)) for s in stats.values())
-    total_revenue = sum(float(r.get("revenue", 0)) for r in binom_map.values())
-    total_profit  = total_revenue - total_cost
-    total_roi     = (total_profit / total_cost * 100) if total_cost > 0 else 0
-    total_leads   = sum(int(r.get("leads", 0)) for r in binom_map.values())
+    # ── KPI totals from AK ───────────────────────────────────────────────────
+    total_clicks  = int(total_row.get("adv_clicks", 0))
+    total_cost    = float(total_row.get("adv_cost", 0))
+    total_revenue = float(total_row.get("adv_value", 0))
+    total_profit  = float(total_row.get("adv_profit", 0))
+    total_roi     = float(total_row.get("adv_roi", 0))
+    total_convs   = int(total_row.get("adv_conversions", 0))
+    total_cpa     = float(total_row.get("adv_cpa") or 0)
+    total_cpc     = float(total_row.get("adv_cpc") or 0)
 
-    roi_color = "green" if total_roi > 0 else "red"
+    # ── Subtitle ─────────────────────────────────────────────────────────────
+    st.markdown(
+        f'<p style="color:#9ca3af;font-size:0.8rem;margin:-4px 0 20px 0;">'
+        f'{period_label} · <b style="color:#6b7280">{len(active)}</b> offers activas · '
+        f'<b style="color:#6b7280">{len(offers)}</b> total</p>',
+        unsafe_allow_html=True
+    )
 
-    # ── KPI Row ─────────────────────────────────────────────────────────────
-    st.markdown("<h1>Dashboard</h1>", unsafe_allow_html=True)
-    st.markdown(f'<p style="color:#6b7280;font-size:0.875rem;margin-bottom:1.5rem;">{date_range} · {len(active)} offers activas · {len(offers)} total</p>', unsafe_allow_html=True)
+    # ── KPI cards ────────────────────────────────────────────────────────────
+    def kpi(label, value, sub="", color="#111827", bg="#fff", border="#e5e7eb"):
+        return f"""<div style="background:{bg};border:1px solid {border};border-radius:12px;
+            padding:18px 20px;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
+          <div style="font-size:0.68rem;font-weight:600;color:#9ca3af;text-transform:uppercase;
+              letter-spacing:0.08em;margin-bottom:10px">{label}</div>
+          <div style="font-size:1.75rem;font-weight:700;color:{color};line-height:1;
+              letter-spacing:-0.02em">{value}</div>
+          {f'<div style="font-size:0.72rem;color:#9ca3af;margin-top:6px">{sub}</div>' if sub else ''}
+        </div>"""
+
+    roi_color  = "#059669" if total_roi >= 0 else "#dc2626"
+    roi_bg     = "#f0fdf4" if total_roi >= 0 else "#fef2f2"
+    prof_color = "#059669" if total_profit >= 0 else "#dc2626"
 
     k1, k2, k3, k4, k5, k6 = st.columns(6)
-    k1.markdown(metric_card("Gasto Total",    f"${total_cost:,.2f}",   "red" if total_cost > 0 else ""), unsafe_allow_html=True)
-    k2.markdown(metric_card("Revenue",        f"${total_revenue:,.2f}", "green" if total_revenue > 0 else ""), unsafe_allow_html=True)
-    k3.markdown(metric_card("Profit",         f"${total_profit:,.2f}", "green" if total_profit >= 0 else "red"), unsafe_allow_html=True)
-    k4.markdown(metric_card("ROI",            f"{total_roi:+.1f}%",    roi_color), unsafe_allow_html=True)
-    k5.markdown(metric_card("Leads / Conv.",  total_leads,             "green" if total_leads > 0 else ""), unsafe_allow_html=True)
-    k6.markdown(metric_card("Clicks",         f"{total_clicks:,}",     ""), unsafe_allow_html=True)
+    k1.markdown(kpi("Gasto", f"${total_cost:,.2f}", f"CPC: ${total_cpc:.3f}"), unsafe_allow_html=True)
+    k2.markdown(kpi("Revenue", f"${total_revenue:,.2f}", f"{total_convs} conversiones"), unsafe_allow_html=True)
+    k3.markdown(kpi("Profit", f"${total_profit:+,.2f}", f"CPA: ${total_cpa:.2f}" if total_cpa else "sin conv.", color=prof_color), unsafe_allow_html=True)
+    k4.markdown(kpi("ROI", f"{total_roi:+.1f}%", f"{period_label}", color=roi_color, bg=roi_bg, border=roi_bg), unsafe_allow_html=True)
+    k5.markdown(kpi("Conversiones", str(total_convs), f"CPA: ${total_cpa:.2f}" if total_cpa else "—"), unsafe_allow_html=True)
+    k6.markdown(kpi("Clicks", f"{total_clicks:,}", f"EPC: ${(total_revenue/total_clicks):.3f}" if total_clicks else "—"), unsafe_allow_html=True)
 
-    st.markdown("<hr>", unsafe_allow_html=True)
+    st.markdown("<br>", unsafe_allow_html=True)
 
-    # ── Alertas ─────────────────────────────────────────────────────────────
+    # ── Alertas ──────────────────────────────────────────────────────────────
     alerts = []
-    for o in active:
-        oid  = int(o["id"])
-        s    = stats.get(oid, {})
-        cost = float(s.get("cost", 0))
-        name = o["name"].replace("US - ", "").replace(" - Voolty", "")
-
-        bkey = next((k for k in binom_map if name.lower() in k.lower() or k.lower() in name.lower()), None)
-        leads = int(binom_map[bkey].get("leads", 0)) if bkey else 0
-        roi   = float(binom_map[bkey].get("roi", 0)) if bkey else None
-
-        if cost >= SPEND_ALERT and leads == 0:
-            alerts.append(("🔴", f"**{name}** gastó ${cost:.2f} sin conversiones — considerá pausar o bajar bid"))
-        elif roi is not None and roi < -60 and cost > 5:
-            alerts.append(("🟠", f"**{name}** ROI {roi:+.1f}% con ${cost:.2f} gastados — bajá el bid"))
-        elif roi is not None and roi > 80 and cost > 5:
-            alerts.append(("🟢", f"**{name}** ROI {roi:+.1f}% — podés subir el bid para escalar"))
+    for oid_key, s in offer_stats.items():
+        cost  = float(s.get("adv_cost", 0))
+        convs = int(s.get("adv_conversions", 0))
+        roi   = float(s.get("adv_roi") or -100)
+        name  = s.get("offer", "").replace("US - ", "").replace(" - Voolty", "")
+        bid_avg = float(s.get("adv_bids_avg") or 0)
+        if cost >= SPEND_ALERT and convs == 0:
+            alerts.append(("danger", f"{name} — ${cost:.0f} gastados, 0 conversiones. Pausar o bajar bid."))
+        elif roi < -70 and cost > 10:
+            alerts.append(("warning", f"{name} — ROI {roi:+.0f}% con ${cost:.0f} invertidos. Revisar bid (actual ${bid_avg:.2f})."))
+        elif roi > 100 and cost > 15:
+            alerts.append(("success", f"{name} — ROI {roi:+.0f}%! Podés subir el bid para escalar."))
 
     if alerts:
-        st.markdown('<div class="section-header">Alertas</div>', unsafe_allow_html=True)
-        for icon, msg in alerts:
-            st.markdown(f"{icon} {msg}")
-        st.markdown("<hr>", unsafe_allow_html=True)
+        alert_styles = {
+            "danger":  ("border-left:4px solid #ef4444;background:#fef2f2;", "#991b1b"),
+            "warning": ("border-left:4px solid #f59e0b;background:#fffbeb;", "#92400e"),
+            "success": ("border-left:4px solid #10b981;background:#f0fdf4;", "#065f46"),
+        }
+        st.markdown('<div style="font-size:0.75rem;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px">Alertas</div>', unsafe_allow_html=True)
+        for kind, msg in alerts:
+            style, color = alert_styles[kind]
+            st.markdown(
+                f'<div style="{style}border-radius:8px;padding:10px 16px;margin-bottom:8px;'
+                f'font-size:0.85rem;color:{color}">{msg}</div>',
+                unsafe_allow_html=True
+            )
+        st.markdown("<br>", unsafe_allow_html=True)
 
-    # ── Tabla de offers ─────────────────────────────────────────────────────
-    st.markdown('<div class="section-header">Offers activas — detalle</div>', unsafe_allow_html=True)
+    # ── Tabla de offers ──────────────────────────────────────────────────────
+    st.markdown('<div style="font-size:0.75rem;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px">Detalle por Offer</div>', unsafe_allow_html=True)
+
+    # Build offer_id → AK offer object map
+    offer_id_map = {int(o["id"]): o for o in offers}
 
     rows = []
-    for o in sorted(active, key=lambda x: float(stats.get(int(x["id"]), {}).get("cost", 0)), reverse=True):
-        oid   = int(o["id"])
-        s     = stats.get(oid, {})
-        cost  = float(s.get("cost", 0))
-        clicks = int(s.get("clicks", 0))
-        name  = o["name"].replace("US - ", "").replace(" - Voolty", "")
-        bid   = float(o.get("bid", 0))
-        max_b = float(o.get("max_bid") or 0)
+    for oid_key, s in sorted(offer_stats.items(), key=lambda x: float(x[1].get("adv_cost", 0)), reverse=True):
+        oid    = int(oid_key)
+        cost   = float(s.get("adv_cost", 0))
+        rev    = float(s.get("adv_value", 0))
+        profit = float(s.get("adv_profit", 0))
+        roi    = float(s.get("adv_roi") or -100 if s.get("adv_conversions", 0) > 0 or cost > 0 else 0)
+        convs  = int(s.get("adv_conversions", 0))
+        clicks = int(s.get("adv_clicks", 0))
+        cpc    = float(s.get("adv_cpc") or 0)
+        cpa    = float(s.get("adv_cpa") or 0)
+        epc    = float(s.get("adv_epc") or 0)
+        name   = s.get("offer", "").replace("US - ", "").replace(" - Voolty", "")
 
-        bkey = next((k for k in binom_map if name.lower() in k.lower() or k.lower() in name.lower()), None)
-        rev   = float(binom_map[bkey].get("revenue", 0)) if bkey else 0
-        leads = int(binom_map[bkey].get("leads", 0)) if bkey else 0
-        roi   = float(binom_map[bkey].get("roi", 0)) if bkey else None
-        epc   = float(binom_map[bkey].get("epc", 0)) if bkey else 0
-        profit = rev - cost
+        # Get bid from offer config
+        ak_offer = offer_id_map.get(oid, {})
+        bid   = float(ak_offer.get("bid", 0))
+        max_b = float(ak_offer.get("max_bid") or 0)
+        is_active = ak_offer.get("is_active", True)
 
-        # Semáforo
-        if roi is None:
-            flag = "⚪"
-        elif roi > 30:
+        # ROI semaphore
+        if not is_active:
+            flag = "⬜"
+        elif convs == 0 and cost > 5:
+            flag = "🔴"
+        elif roi > 50:
             flag = "🟢"
-        elif roi > -20:
+        elif roi > 0:
             flag = "🟡"
+        elif roi > -50:
+            flag = "🟠"
         else:
             flag = "🔴"
 
         rows.append({
-            " ":        flag,
+            "":         flag,
             "Offer":    name,
             "Clicks":   clicks,
-            "Gasto":    f"${cost:.2f}" if cost > 0 else "—",
-            "Revenue":  f"${rev:.2f}"  if rev  > 0 else "—",
-            "Profit":   f"${profit:+.2f}" if rev > 0 else "—",
-            "ROI":      f"{roi:+.1f}%" if roi is not None else "—",
-            "Leads":    leads if leads > 0 else "—",
-            "EPC":      f"${epc:.4f}" if epc > 0 else "—",
+            "Conv.":    convs,
+            "Gasto":    f"${cost:.2f}",
+            "Revenue":  f"${rev:.2f}",
+            "Profit":   f"${profit:+.2f}",
+            "ROI":      f"{roi:+.1f}%",
+            "CPC":      f"${cpc:.3f}",
+            "CPA":      f"${cpa:.2f}" if cpa else "—",
+            "EPC":      f"${epc:.3f}" if epc else "—",
             "Bid":      f"${bid:.2f}",
-            "Max Bid":  f"${max_b:.2f}" if max_b > 0 else "—",
+            "Max Bid":  f"${max_b:.2f}" if max_b else "—",
         })
 
     if rows:
-        st.dataframe(rows, width='stretch', hide_index=True)
+        st.dataframe(rows, use_container_width=True, hide_index=True)
     else:
-        st.info("No hay offers activas.")
+        st.info("Sin datos para el período seleccionado.")
 
     # ── Offers sin activar ───────────────────────────────────────────────────
     if inactive:
-        st.markdown("<hr>", unsafe_allow_html=True)
-        with st.expander(f"Offers inactivas ({len(inactive)}) — pendientes de revisión"):
+        st.markdown("<br>", unsafe_allow_html=True)
+        with st.expander(f"Offers inactivas ({len(inactive)})"):
             irows = [{
-                "Offer":   o["name"].replace("US - ","").replace(" - Voolty",""),
-                "ID":      o["id"],
-                "Bid":     f"${float(o.get('bid',0)):.2f}",
+                "Offer":  o["name"].replace("US - ","").replace(" - Voolty",""),
+                "ID":     o["id"],
+                "Bid":    f"${float(o.get('bid',0)):.2f}",
+                "Max":    f"${float(o.get('max_bid',0)):.2f}" if o.get("max_bid") else "—",
             } for o in inactive]
-            st.dataframe(irows, width='stretch', hide_index=True)
-
-    # ── Datos Binom manuales ─────────────────────────────────────────────────
-    st.markdown("<hr>", unsafe_allow_html=True)
-    binom_status_label = "🟢 API OK" if binom_api_ok else "🔴 API no disponible"
-    with st.expander(f"Datos Binom — {binom_status_label} · click para editar manualmente"):
-        st.markdown(
-            '<p style="color:#6b7280;font-size:0.8rem;margin-bottom:12px;">'
-            'El API de Binom está temporalmente caído (502). Ingresá los valores manualmente '
-            'para que el dashboard muestre métricas reales. Los datos se guardan localmente.</p>',
-            unsafe_allow_html=True
-        )
-        current_manual = load_binom_manual()
-
-        offer_names = [o["name"].replace("US - ", "").replace(" - Voolty", "") for o in active]
-
-        with st.form("binom_manual_form"):
-            cols_header = st.columns([3, 2, 2, 2, 2])
-            cols_header[0].markdown("**Offer**")
-            cols_header[1].markdown("**Revenue ($)**")
-            cols_header[2].markdown("**Cost ($)**")
-            cols_header[3].markdown("**Leads**")
-            cols_header[4].markdown("**Clicks**")
-
-            entries = {}
-            for oname in offer_names:
-                saved = current_manual.get(oname, {})
-                c0, c1, c2, c3, c4 = st.columns([3, 2, 2, 2, 2])
-                c0.markdown(f"<span style='font-size:0.85rem'>{oname}</span>", unsafe_allow_html=True)
-                rev  = c1.number_input("", key=f"rev_{oname}",  value=float(saved.get("revenue", 0)), step=0.01, format="%.2f", label_visibility="collapsed")
-                cost = c2.number_input("", key=f"cost_{oname}", value=float(saved.get("cost", 0)),    step=0.01, format="%.2f", label_visibility="collapsed")
-                leads= c3.number_input("", key=f"leads_{oname}",value=int(saved.get("leads", 0)),     step=1,    format="%d",   label_visibility="collapsed")
-                clks = c4.number_input("", key=f"clks_{oname}", value=int(saved.get("clicks", 0)),    step=1,    format="%d",   label_visibility="collapsed")
-                profit = rev - cost
-                roi_val = (profit / cost * 100) if cost > 0 else 0
-                entries[oname] = {
-                    "revenue": rev, "cost": cost, "leads": leads, "clicks": clks,
-                    "profit": profit, "roi": roi_val,
-                    "epc": (rev / clks) if clks > 0 else 0,
-                }
-
-            submitted = st.form_submit_button("💾  Guardar datos Binom", type="primary")
-            if submitted:
-                save_binom_manual(entries)
-                st.success("Datos guardados. Actualizá el dashboard para ver los cambios.")
-                st.cache_data.clear()
+            st.dataframe(irows, use_container_width=True, hide_index=True)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
