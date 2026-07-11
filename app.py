@@ -198,6 +198,21 @@ AK_VERSION     = 6
 AK_CAMPAIGN_ID = int(os.environ.get("ADKERNEL_CAMPAIGN_ID", "2513696"))
 BINOM_KEY      = os.environ.get("BINOM_KEY", "1f109c4331f132305a195943dff50e007f36333f95b3189c7def94d0e0c6bc8b")
 CREATED_FILE   = ROOT / "created_brands.json"
+BINOM_DATA_FILE = ROOT / "binom_data.json"
+
+
+def load_binom_manual() -> dict:
+    """Carga datos Binom ingresados manualmente. Clave = nombre corto de offer."""
+    if BINOM_DATA_FILE.exists():
+        try:
+            return json.loads(BINOM_DATA_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    return {}
+
+
+def save_binom_manual(data: dict):
+    BINOM_DATA_FILE.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -314,10 +329,16 @@ if page == "Dashboard":
 
     stats    = ak_get_stats(tok)
     binom_st = binom_get_stats(BINOM_KEY)
+    binom_api_ok = bool(binom_st)
     binom_map = {}
     for row in binom_st:
         name = row.get("name", "")
         binom_map[name] = row
+
+    # Si el API de Binom falló, usar datos ingresados manualmente
+    manual_binom = load_binom_manual()
+    if not binom_api_ok and manual_binom:
+        binom_map = {k: v for k, v in manual_binom.items()}
 
     active   = [o for o in offers if o.get("is_active")]
     inactive = [o for o in offers if not o.get("is_active")]
@@ -354,7 +375,7 @@ if page == "Dashboard":
         cost = float(s.get("cost", 0))
         name = o["name"].replace("US - ", "").replace(" - Voolty", "")
 
-        bkey = next((k for k in binom_map if name.lower().split()[0] in k.lower()), None)
+        bkey = next((k for k in binom_map if name.lower() in k.lower() or k.lower() in name.lower()), None)
         leads = int(binom_map[bkey].get("leads", 0)) if bkey else 0
         roi   = float(binom_map[bkey].get("roi", 0)) if bkey else None
 
@@ -384,7 +405,7 @@ if page == "Dashboard":
         bid   = float(o.get("bid", 0))
         max_b = float(o.get("max_bid") or 0)
 
-        bkey = next((k for k in binom_map if name.lower().split()[0] in k.lower()), None)
+        bkey = next((k for k in binom_map if name.lower() in k.lower() or k.lower() in name.lower()), None)
         rev   = float(binom_map[bkey].get("revenue", 0)) if bkey else 0
         leads = int(binom_map[bkey].get("leads", 0)) if bkey else 0
         roi   = float(binom_map[bkey].get("roi", 0)) if bkey else None
@@ -430,6 +451,51 @@ if page == "Dashboard":
                 "Bid":     f"${float(o.get('bid',0)):.2f}",
             } for o in inactive]
             st.dataframe(irows, width='stretch', hide_index=True)
+
+    # ── Datos Binom manuales ─────────────────────────────────────────────────
+    st.markdown("<hr>", unsafe_allow_html=True)
+    binom_status_label = "🟢 API OK" if binom_api_ok else "🔴 API no disponible"
+    with st.expander(f"Datos Binom — {binom_status_label} · click para editar manualmente"):
+        st.markdown(
+            '<p style="color:#6b7280;font-size:0.8rem;margin-bottom:12px;">'
+            'El API de Binom está temporalmente caído (502). Ingresá los valores manualmente '
+            'para que el dashboard muestre métricas reales. Los datos se guardan localmente.</p>',
+            unsafe_allow_html=True
+        )
+        current_manual = load_binom_manual()
+
+        offer_names = [o["name"].replace("US - ", "").replace(" - Voolty", "") for o in active]
+
+        with st.form("binom_manual_form"):
+            cols_header = st.columns([3, 2, 2, 2, 2])
+            cols_header[0].markdown("**Offer**")
+            cols_header[1].markdown("**Revenue ($)**")
+            cols_header[2].markdown("**Cost ($)**")
+            cols_header[3].markdown("**Leads**")
+            cols_header[4].markdown("**Clicks**")
+
+            entries = {}
+            for oname in offer_names:
+                saved = current_manual.get(oname, {})
+                c0, c1, c2, c3, c4 = st.columns([3, 2, 2, 2, 2])
+                c0.markdown(f"<span style='font-size:0.85rem'>{oname}</span>", unsafe_allow_html=True)
+                rev  = c1.number_input("", key=f"rev_{oname}",  value=float(saved.get("revenue", 0)), step=0.01, format="%.2f", label_visibility="collapsed")
+                cost = c2.number_input("", key=f"cost_{oname}", value=float(saved.get("cost", 0)),    step=0.01, format="%.2f", label_visibility="collapsed")
+                leads= c3.number_input("", key=f"leads_{oname}",value=int(saved.get("leads", 0)),     step=1,    format="%d",   label_visibility="collapsed")
+                clks = c4.number_input("", key=f"clks_{oname}", value=int(saved.get("clicks", 0)),    step=1,    format="%d",   label_visibility="collapsed")
+                profit = rev - cost
+                roi_val = (profit / cost * 100) if cost > 0 else 0
+                entries[oname] = {
+                    "revenue": rev, "cost": cost, "leads": leads, "clicks": clks,
+                    "profit": profit, "roi": roi_val,
+                    "epc": (rev / clks) if clks > 0 else 0,
+                }
+
+            submitted = st.form_submit_button("💾  Guardar datos Binom", type="primary")
+            if submitted:
+                save_binom_manual(entries)
+                st.success("Datos guardados. Actualizá el dashboard para ver los cambios.")
+                st.cache_data.clear()
 
 
 # ══════════════════════════════════════════════════════════════════════════════
