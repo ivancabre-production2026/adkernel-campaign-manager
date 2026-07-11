@@ -258,39 +258,178 @@ with st.sidebar:
 # DASHBOARD
 # ══════════════════════════════════════════════════════════════════════════════
 if page == "Dashboard":
-    st.markdown("<h1>Dashboard</h1>", unsafe_allow_html=True)
-    st.markdown('<p style="color:#6b7280;font-size:0.875rem;margin-bottom:1.5rem;">Resumen del sistema en tiempo real.</p>', unsafe_allow_html=True)
+    import datetime
 
-    with st.spinner(""):
+    # ── Fetch data ─────────────────────────────────────────────────────────
+    col_ref, col_range, _ = st.columns([1, 2, 4])
+    with col_ref:
+        if st.button("↺  Actualizar"):
+            st.cache_data.clear()
+            st.rerun()
+    with col_range:
+        date_range = st.selectbox("Período", ["Hoy", "Últimos 7 días", "Últimos 30 días"],
+                                   index=2, label_visibility="collapsed")
+
+    SPEND_ALERT = 30.0   # alerta si una offer gasta más de este $ sin conversiones
+
+    with st.spinner("Cargando datos..."):
         try:
-            offers  = ak_get_offers(ak_get_token())
-            active  = [o for o in offers if o.get("is_active")]
-            created = load_created()
-            total_created = created.get("total", 0)
+            tok    = ak_get_token()
+            offers = ak_get_offers(tok)
         except Exception as e:
-            offers, active, created, total_created = [], [], {}, 0
-            st.warning(f"No se pudo conectar a AdKernel: {e}")
+            st.error(f"No se pudo conectar a AdKernel: {e}")
+            st.stop()
 
-    c1, c2, c3, c4 = st.columns(4)
-    c1.markdown(metric_card("Offers en AdKernel",       len(offers)),        unsafe_allow_html=True)
-    c2.markdown(metric_card("Activas",                  len(active), "green"), unsafe_allow_html=True)
-    c3.markdown(metric_card("Total creadas (historial)", total_created),      unsafe_allow_html=True)
-    c4.markdown(metric_card("En revisión / inactivas",  len(offers) - len(active), "amber"), unsafe_allow_html=True)
+    # ── Fetch AdKernel stats (clicks/cost per offer via API) ────────────────
+    @st.cache_data(ttl=180, show_spinner=False)
+    def ak_get_stats(_tok: str) -> dict:
+        """Devuelve {offer_id: {clicks, cost, impressions}} desde AdKernel."""
+        try:
+            now   = datetime.date.today()
+            start = now - datetime.timedelta(days=29)
+            r = requests.get(f"{AK_BASE}/admin/api/Stat/",
+                params={"version": AK_VERSION, "token": _tok,
+                        "ad_campaign_id": AK_CAMPAIGN_ID,
+                        "date_from": str(start), "date_to": str(now),
+                        "group_by": "offer", "limit": 500},
+                timeout=30)
+            rows = r.json().get("response", {}).get("rows", {})
+            return {int(k): v for k, v in rows.items()}
+        except Exception:
+            return {}
+
+    @st.cache_data(ttl=300, show_spinner=False)
+    def binom_get_stats(_key: str) -> list:
+        """Devuelve stats de campañas desde Binom."""
+        try:
+            r = requests.post("https://ilatintrack.biz/public/api/v1/click.stat",
+                headers={"Api-Key": _key},
+                json={"group1": "campaign_name", "date": "last_30_days"},
+                timeout=45)
+            if r.ok:
+                return r.json() if r.text else []
+        except Exception:
+            pass
+        return []
+
+    stats    = ak_get_stats(tok)
+    binom_st = binom_get_stats(BINOM_KEY)
+    binom_map = {}
+    for row in binom_st:
+        name = row.get("name", "")
+        binom_map[name] = row
+
+    active   = [o for o in offers if o.get("is_active")]
+    inactive = [o for o in offers if not o.get("is_active")]
+
+    # ── Aggregate totals ────────────────────────────────────────────────────
+    total_clicks = sum(s.get("clicks", 0) for s in stats.values())
+    total_cost   = sum(float(s.get("cost", 0)) for s in stats.values())
+    total_revenue = sum(float(r.get("revenue", 0)) for r in binom_map.values())
+    total_profit  = total_revenue - total_cost
+    total_roi     = (total_profit / total_cost * 100) if total_cost > 0 else 0
+    total_leads   = sum(int(r.get("leads", 0)) for r in binom_map.values())
+
+    roi_color = "green" if total_roi > 0 else "red"
+
+    # ── KPI Row ─────────────────────────────────────────────────────────────
+    st.markdown("<h1>Dashboard</h1>", unsafe_allow_html=True)
+    st.markdown(f'<p style="color:#6b7280;font-size:0.875rem;margin-bottom:1.5rem;">{date_range} · {len(active)} offers activas · {len(offers)} total</p>', unsafe_allow_html=True)
+
+    k1, k2, k3, k4, k5, k6 = st.columns(6)
+    k1.markdown(metric_card("Gasto Total",    f"${total_cost:,.2f}",   "red" if total_cost > 0 else ""), unsafe_allow_html=True)
+    k2.markdown(metric_card("Revenue",        f"${total_revenue:,.2f}", "green" if total_revenue > 0 else ""), unsafe_allow_html=True)
+    k3.markdown(metric_card("Profit",         f"${total_profit:,.2f}", "green" if total_profit >= 0 else "red"), unsafe_allow_html=True)
+    k4.markdown(metric_card("ROI",            f"{total_roi:+.1f}%",    roi_color), unsafe_allow_html=True)
+    k5.markdown(metric_card("Leads / Conv.",  total_leads,             "green" if total_leads > 0 else ""), unsafe_allow_html=True)
+    k6.markdown(metric_card("Clicks",         f"{total_clicks:,}",     ""), unsafe_allow_html=True)
 
     st.markdown("<hr>", unsafe_allow_html=True)
-    st.markdown('<div class="section-header">Offers activas</div>', unsafe_allow_html=True)
 
-    if active:
-        rows = [{
-            "Nombre":   o["name"].replace("US - ", "").replace(" - Voolty", ""),
-            "ID":       o["id"],
-            "CPC":      f"${o['bid']:.2f}",
-            "Max Bid":  f"${o['max_bid']:.2f}" if o.get("max_bid") else "—",
-            "Optimiz.": "Sí" if o.get("optimize_bids_new") else "No",
-        } for o in active]
+    # ── Alertas ─────────────────────────────────────────────────────────────
+    alerts = []
+    for o in active:
+        oid  = int(o["id"])
+        s    = stats.get(oid, {})
+        cost = float(s.get("cost", 0))
+        name = o["name"].replace("US - ", "").replace(" - Voolty", "")
+
+        bkey = next((k for k in binom_map if name.lower().split()[0] in k.lower()), None)
+        leads = int(binom_map[bkey].get("leads", 0)) if bkey else 0
+        roi   = float(binom_map[bkey].get("roi", 0)) if bkey else None
+
+        if cost >= SPEND_ALERT and leads == 0:
+            alerts.append(("🔴", f"**{name}** gastó ${cost:.2f} sin conversiones — considerá pausar o bajar bid"))
+        elif roi is not None and roi < -60 and cost > 5:
+            alerts.append(("🟠", f"**{name}** ROI {roi:+.1f}% con ${cost:.2f} gastados — bajá el bid"))
+        elif roi is not None and roi > 80 and cost > 5:
+            alerts.append(("🟢", f"**{name}** ROI {roi:+.1f}% — podés subir el bid para escalar"))
+
+    if alerts:
+        st.markdown('<div class="section-header">Alertas</div>', unsafe_allow_html=True)
+        for icon, msg in alerts:
+            st.markdown(f"{icon} {msg}")
+        st.markdown("<hr>", unsafe_allow_html=True)
+
+    # ── Tabla de offers ─────────────────────────────────────────────────────
+    st.markdown('<div class="section-header">Offers activas — detalle</div>', unsafe_allow_html=True)
+
+    rows = []
+    for o in sorted(active, key=lambda x: float(stats.get(int(x["id"]), {}).get("cost", 0)), reverse=True):
+        oid   = int(o["id"])
+        s     = stats.get(oid, {})
+        cost  = float(s.get("cost", 0))
+        clicks = int(s.get("clicks", 0))
+        name  = o["name"].replace("US - ", "").replace(" - Voolty", "")
+        bid   = float(o.get("bid", 0))
+        max_b = float(o.get("max_bid") or 0)
+
+        bkey = next((k for k in binom_map if name.lower().split()[0] in k.lower()), None)
+        rev   = float(binom_map[bkey].get("revenue", 0)) if bkey else 0
+        leads = int(binom_map[bkey].get("leads", 0)) if bkey else 0
+        roi   = float(binom_map[bkey].get("roi", 0)) if bkey else None
+        epc   = float(binom_map[bkey].get("epc", 0)) if bkey else 0
+        profit = rev - cost
+
+        # Semáforo
+        if roi is None:
+            flag = "⚪"
+        elif roi > 30:
+            flag = "🟢"
+        elif roi > -20:
+            flag = "🟡"
+        else:
+            flag = "🔴"
+
+        rows.append({
+            " ":        flag,
+            "Offer":    name,
+            "Clicks":   clicks,
+            "Gasto":    f"${cost:.2f}" if cost > 0 else "—",
+            "Revenue":  f"${rev:.2f}"  if rev  > 0 else "—",
+            "Profit":   f"${profit:+.2f}" if rev > 0 else "—",
+            "ROI":      f"{roi:+.1f}%" if roi is not None else "—",
+            "Leads":    leads if leads > 0 else "—",
+            "EPC":      f"${epc:.4f}" if epc > 0 else "—",
+            "Bid":      f"${bid:.2f}",
+            "Max Bid":  f"${max_b:.2f}" if max_b > 0 else "—",
+        })
+
+    if rows:
         st.dataframe(rows, width='stretch', hide_index=True)
     else:
-        st.info("No hay offers activas en este momento.")
+        st.info("No hay offers activas.")
+
+    # ── Offers sin activar ───────────────────────────────────────────────────
+    if inactive:
+        st.markdown("<hr>", unsafe_allow_html=True)
+        with st.expander(f"Offers inactivas ({len(inactive)}) — pendientes de revisión"):
+            irows = [{
+                "Offer":   o["name"].replace("US - ","").replace(" - Voolty",""),
+                "ID":      o["id"],
+                "Bid":     f"${float(o.get('bid',0)):.2f}",
+            } for o in inactive]
+            st.dataframe(irows, width='stretch', hide_index=True)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
