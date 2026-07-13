@@ -161,6 +161,29 @@ def ak_get_offer_stats(_tok: str, date_param: str) -> dict:
         return {}
 
 
+@st.cache_data(ttl=300, show_spinner=False)
+def ak_get_keyword_stats(_tok: str, date_param: str) -> dict:
+    """Devuelve {offer_id: [rows]} desde AdvertiserReports/offer,keyword2 (desglose por keyword/dominio dentro de cada offer)."""
+    try:
+        r = requests.get(f"{AK_BASE}/admin/api/AdvertiserReports/offer,keyword2",
+            params={"version": AK_VERSION, "token": _tok,
+                    "ad_campaign_id": AK_CAMPAIGN_ID,
+                    "date": date_param, "limit": 2000},
+            timeout=30)
+        data = r.json()
+        if data.get("status") != "OK":
+            return {}
+        rows = data["response"]["list"]["rows"]
+        result = {}
+        for row in rows.values():
+            oid = row.get("offer_id")
+            if oid:
+                result.setdefault(int(oid), []).append(row)
+        return result
+    except Exception:
+        return {}
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # DASHBOARD
 # ══════════════════════════════════════════════════════════════════════════════
@@ -239,28 +262,6 @@ if page == "Dashboard":
         st.metric("Clicks", f"{total_clicks:,}",
                    f"EPC ${epc:.3f}" if total_clicks else None, delta_color="off", border=True)
 
-    # ── Alertas ──────────────────────────────────────────────────────────────
-    alerts = []
-    for oid_key, s in offer_stats.items():
-        cost  = float(s.get("adv_cost", 0))
-        convs = int(s.get("adv_conversions", 0))
-        roi   = float(s.get("adv_roi") or -100)
-        name  = s.get("offer", "").replace("US - ", "").replace(" - Voolty", "")
-        bid_avg = float(s.get("adv_bids_avg") or 0)
-        if cost >= SPEND_ALERT and convs == 0:
-            alerts.append(("danger", f"**{name}** — \\${cost:.0f} gastados, 0 conversiones. Pausar o bajar bid."))
-        elif roi < -70 and cost > 10:
-            alerts.append(("warning", f"**{name}** — ROI {roi:+.0f}% con \\${cost:.0f} invertidos. Revisar bid (actual \\${bid_avg:.2f})."))
-        elif roi > 100 and cost > 15:
-            alerts.append(("success", f"**{name}** — ROI {roi:+.0f}%! Podés subir el bid para escalar."))
-
-    if alerts:
-        callout = {"danger": st.error, "warning": st.warning, "success": st.success}
-        icon = {"danger": ":material/error:", "warning": ":material/priority_high:", "success": ":material/trending_up:"}
-        st.caption("Alertas")
-        for kind, msg in alerts:
-            callout[kind](msg, icon=icon[kind])
-
     # ── Tabla de offers ──────────────────────────────────────────────────────
     st.caption("Detalle por offer")
 
@@ -268,6 +269,7 @@ if page == "Dashboard":
     offer_id_map = {int(o["id"]): o for o in offers}
 
     rows = []
+    offer_options = {}
     for oid_key, s in sorted(offer_stats.items(), key=lambda x: float(x[1].get("adv_cost", 0)), reverse=True):
         oid    = int(oid_key)
         cost   = float(s.get("adv_cost", 0))
@@ -316,11 +318,85 @@ if page == "Dashboard":
             "Bid":      f"${bid:.2f}",
             "Max Bid":  f"${max_b:.2f}" if max_b else "—",
         })
+        offer_options[f"{name}  (ID {oid})"] = oid
 
     if rows:
         st.dataframe(rows, width="stretch", hide_index=True)
     else:
         st.info("Sin datos para el período seleccionado.", icon=":material/info:")
+
+    # ── Detalle por keyword + acciones rápidas ────────────────────────────────
+    st.caption("Detalle por keyword")
+
+    if offer_options:
+        sel_label = st.selectbox("Offer", list(offer_options.keys()), label_visibility="collapsed")
+        sel_oid   = offer_options[sel_label]
+        sel_offer = offer_id_map.get(sel_oid, {})
+
+        with st.container(horizontal=True, vertical_alignment="bottom"):
+            kw_bid = st.number_input("Default CPC ($)", min_value=0.01, max_value=5.0,
+                value=float(sel_offer.get("bid", 0.10)), step=0.01, format="%.2f", key="dash_bid")
+            kw_state = st.selectbox("Estado", ["Activa", "Inactiva"],
+                index=0 if sel_offer.get("is_active") else 1, key="dash_state")
+            if st.button("Guardar", icon=":material/save:", type="primary", key="dash_save"):
+                try:
+                    r = requests.put(
+                        f"{AK_BASE}/admin/api/OfferNew/{sel_oid}",
+                        params={"version": AK_VERSION, "token": tok},
+                        json={"bid": kw_bid, "is_active": kw_state == "Activa"},
+                        timeout=20
+                    )
+                    if r.json().get("status") == "OK":
+                        st.success(f"Offer {sel_oid} actualizada.", icon=":material/check_circle:")
+                        st.cache_data.clear()
+                        time.sleep(0.8)
+                        st.rerun()
+                    else:
+                        st.error(r.text, icon=":material/error:")
+                except Exception as e:
+                    st.error(f"Error: {e}", icon=":material/error:")
+
+        keyword_stats = ak_get_keyword_stats(tok, date_param)
+        kw_rows_raw = keyword_stats.get(sel_oid, [])
+        kw_rows = [{
+            "Keyword":  k.get("keyword2", "—"),
+            "Clicks":   int(k.get("adv_clicks", 0)),
+            "Conv.":    int(k.get("adv_conversions", 0)),
+            "Gasto":    f"${float(k.get('adv_cost', 0)):.2f}",
+            "Revenue":  f"${float(k.get('adv_value', 0)):.2f}",
+            "Profit":   f"${float(k.get('adv_profit', 0)):+.2f}",
+            "ROI":      f"{float(k.get('adv_roi') or -100):+.1f}%",
+            "Bid prom.": f"${float(k.get('adv_bids_avg') or 0):.3f}",
+        } for k in sorted(kw_rows_raw, key=lambda x: float(x.get("adv_cost", 0)), reverse=True)]
+
+        if kw_rows:
+            st.dataframe(kw_rows, width="stretch", hide_index=True)
+        else:
+            st.caption("Sin datos de keywords para esta offer en el período seleccionado.")
+    else:
+        st.caption("No hay offers con datos en este período.")
+
+    # ── Alertas ──────────────────────────────────────────────────────────────
+    alerts = []
+    for oid_key, s in offer_stats.items():
+        cost  = float(s.get("adv_cost", 0))
+        convs = int(s.get("adv_conversions", 0))
+        roi   = float(s.get("adv_roi") or -100)
+        name  = s.get("offer", "").replace("US - ", "").replace(" - Voolty", "")
+        bid_avg = float(s.get("adv_bids_avg") or 0)
+        if cost >= SPEND_ALERT and convs == 0:
+            alerts.append(("danger", f"**{name}** — \\${cost:.0f} gastados, 0 conversiones. Pausar o bajar bid."))
+        elif roi < -70 and cost > 10:
+            alerts.append(("warning", f"**{name}** — ROI {roi:+.0f}% con \\${cost:.0f} invertidos. Revisar bid (actual \\${bid_avg:.2f})."))
+        elif roi > 100 and cost > 15:
+            alerts.append(("success", f"**{name}** — ROI {roi:+.0f}%! Podés subir el bid para escalar."))
+
+    if alerts:
+        callout = {"danger": st.error, "warning": st.warning, "success": st.success}
+        icon = {"danger": ":material/error:", "warning": ":material/priority_high:", "success": ":material/trending_up:"}
+        with st.expander(f"Alertas ({len(alerts)})", icon=":material/notifications:"):
+            for kind, msg in alerts:
+                callout[kind](msg, icon=icon[kind])
 
     # ── Offers sin activar ───────────────────────────────────────────────────
     if inactive:
