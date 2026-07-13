@@ -9,6 +9,7 @@ import time
 import io
 import contextlib
 from pathlib import Path
+import pandas as pd
 import requests
 import streamlit as st
 
@@ -103,6 +104,37 @@ def load_created() -> dict:
     if CREATED_FILE.exists():
         return json.loads(CREATED_FILE.read_text(encoding="utf-8"))
     return {}
+
+
+# ── Semaforo de performance (colores tipo Binom) ────────────────────────────────
+ROI_TIER_COLORS = {
+    "excellent": "#bbf7d0",
+    "good":      "#dcfce7",
+    "regular":   "#fef9c3",
+    "bad":       "#fecaca",
+    "paused":    "#f1f5f9",
+}
+
+
+def roi_tier(roi: float, active: bool = True, spent: bool = False, converted: bool = False) -> str:
+    if not active:
+        return "paused"
+    if spent and not converted:
+        return "bad"
+    if roi > 100:
+        return "excellent"
+    if roi > 0:
+        return "good"
+    if roi > -50:
+        return "regular"
+    return "bad"
+
+
+def style_by_tier(tiers: list):
+    def _style(row):
+        color = ROI_TIER_COLORS.get(tiers[row.name], "")
+        return [f"background-color: {color}"] * len(row) if color else [""] * len(row)
+    return _style
 
 
 # ── Sidebar ────────────────────────────────────────────────────────────────────
@@ -249,10 +281,10 @@ if page == "Dashboard":
     epc = (total_revenue / total_clicks) if total_clicks else 0
 
     with st.container(horizontal=True):
-        st.metric("Gasto", f"${total_cost:,.2f}",
-                   f"CPC ${total_cpc:.3f}", delta_color="off", border=True)
         st.metric("Revenue", f"${total_revenue:,.2f}",
                    f"{total_convs} conversiones", delta_color="off", border=True)
+        st.metric("Gasto", f"${total_cost:,.2f}",
+                   f"CPC ${total_cpc:.3f}", delta_color="off", border=True)
         st.metric("Profit", f"${total_profit:+,.2f}",
                    f"{total_roi:+.1f}% ROI", border=True)
         st.metric("ROI", f"{total_roi:+.1f}%",
@@ -269,6 +301,8 @@ if page == "Dashboard":
     offer_id_map = {int(o["id"]): o for o in offers}
 
     rows = []
+    tiers = []
+    row_oids = []
     offer_options = {}
     for oid_key, s in sorted(offer_stats.items(), key=lambda x: float(x[1].get("adv_cost", 0)), reverse=True):
         oid    = int(oid_key)
@@ -289,39 +323,66 @@ if page == "Dashboard":
         max_b = float(ak_offer.get("max_bid") or 0)
         is_active = ak_offer.get("is_active", True)
 
-        # ROI semaphore
-        if not is_active:
-            flag = "⬜"
-        elif convs == 0 and cost > 5:
-            flag = "🔴"
-        elif roi > 50:
-            flag = "🟢"
-        elif roi > 0:
-            flag = "🟡"
-        elif roi > -50:
-            flag = "🟠"
-        else:
-            flag = "🔴"
-
         rows.append({
-            "":         flag,
             "Offer":    name,
             "Clicks":   clicks,
             "Conv.":    convs,
-            "Gasto":    f"${cost:.2f}",
-            "Revenue":  f"${rev:.2f}",
-            "Profit":   f"${profit:+.2f}",
-            "ROI":      f"{roi:+.1f}%",
-            "CPC":      f"${cpc:.3f}",
-            "CPA":      f"${cpa:.2f}" if cpa else "—",
-            "EPC":      f"${epc:.3f}" if epc else "—",
-            "Bid":      f"${bid:.2f}",
-            "Max Bid":  f"${max_b:.2f}" if max_b else "—",
+            "Revenue":  rev,
+            "Gasto":    cost,
+            "Profit":   profit,
+            "ROI":      roi / 100,
+            "CPC":      cpc,
+            "CPA":      cpa or None,
+            "EPC":      epc or None,
+            "Bid":      bid,
+            "Max Bid":  max_b or None,
+            "Acción":   [":material/pause_circle: Pausar"] if is_active else [":material/play_circle: Activar"],
         })
+        tiers.append(roi_tier(roi, active=is_active, spent=cost > 5, converted=convs > 0))
+        row_oids.append(oid)
         offer_options[f"{name}  (ID {oid})"] = oid
 
+    def _handle_offer_action():
+        click = st.session_state.get("offer_row_action")
+        if not click:
+            return
+        target_oid = row_oids[click["row"]]
+        new_state = "Activar" in click["label"]
+        try:
+            r = requests.put(
+                f"{AK_BASE}/admin/api/OfferNew/{target_oid}",
+                params={"version": AK_VERSION, "token": tok},
+                json={"is_active": new_state}, timeout=20
+            )
+            if r.json().get("status") == "OK":
+                st.cache_data.clear()
+                st.toast(f"Offer {target_oid} {'activada' if new_state else 'pausada'}.", icon=":material/check_circle:")
+            else:
+                st.toast(f"Error: {r.text[:200]}", icon=":material/error:")
+        except Exception as e:
+            st.toast(f"Error: {e}", icon=":material/error:")
+
     if rows:
-        st.dataframe(rows, width="stretch", hide_index=True)
+        df = pd.DataFrame(rows)
+        styled = df.style.apply(style_by_tier(tiers), axis=1)
+        st.dataframe(
+            styled,
+            width="stretch", hide_index=True,
+            column_config={
+                "Revenue": st.column_config.NumberColumn(format="$%.2f"),
+                "Gasto":   st.column_config.NumberColumn(format="$%.2f"),
+                "Profit":  st.column_config.NumberColumn(format="$%.2f"),
+                "ROI":     st.column_config.NumberColumn(format="percent"),
+                "CPC":     st.column_config.NumberColumn(format="$%.3f"),
+                "CPA":     st.column_config.NumberColumn(format="$%.2f"),
+                "EPC":     st.column_config.NumberColumn(format="$%.3f"),
+                "Bid":     st.column_config.NumberColumn(format="$%.2f"),
+                "Max Bid": st.column_config.NumberColumn(format="$%.2f"),
+                "Acción":  st.column_config.ButtonColumn(
+                    "Acción", on_click=_handle_offer_action, key="offer_row_action", width="small"
+                ),
+            },
+        )
     else:
         st.info("Sin datos para el período seleccionado.", icon=":material/info:")
 
@@ -357,20 +418,39 @@ if page == "Dashboard":
                     st.error(f"Error: {e}", icon=":material/error:")
 
         keyword_stats = ak_get_keyword_stats(tok, date_param)
-        kw_rows_raw = keyword_stats.get(sel_oid, [])
-        kw_rows = [{
-            "Keyword":  k.get("keyword2", "—"),
-            "Clicks":   int(k.get("adv_clicks", 0)),
-            "Conv.":    int(k.get("adv_conversions", 0)),
-            "Gasto":    f"${float(k.get('adv_cost', 0)):.2f}",
-            "Revenue":  f"${float(k.get('adv_value', 0)):.2f}",
-            "Profit":   f"${float(k.get('adv_profit', 0)):+.2f}",
-            "ROI":      f"{float(k.get('adv_roi') or -100):+.1f}%",
-            "Bid prom.": f"${float(k.get('adv_bids_avg') or 0):.3f}",
-        } for k in sorted(kw_rows_raw, key=lambda x: float(x.get("adv_cost", 0)), reverse=True)]
+        kw_rows_raw = sorted(keyword_stats.get(sel_oid, []), key=lambda x: float(x.get("adv_cost", 0)), reverse=True)
+        kw_rows = []
+        kw_tiers = []
+        for k in kw_rows_raw:
+            k_cost  = float(k.get("adv_cost", 0))
+            k_convs = int(k.get("adv_conversions", 0))
+            k_roi   = float(k.get("adv_roi") if k.get("adv_roi") is not None else (0 if k_cost == 0 else -100))
+            kw_rows.append({
+                "Keyword":   k.get("keyword2", "—"),
+                "Clicks":    int(k.get("adv_clicks", 0)),
+                "Conv.":     k_convs,
+                "Revenue":   float(k.get("adv_value", 0)),
+                "Gasto":     k_cost,
+                "Profit":    float(k.get("adv_profit", 0)),
+                "ROI":       k_roi / 100,
+                "Bid prom.": float(k.get("adv_bids_avg") or 0),
+            })
+            kw_tiers.append(roi_tier(k_roi, spent=k_cost > 1, converted=k_convs > 0))
 
         if kw_rows:
-            st.dataframe(kw_rows, width="stretch", hide_index=True)
+            kw_df = pd.DataFrame(kw_rows)
+            kw_styled = kw_df.style.apply(style_by_tier(kw_tiers), axis=1)
+            st.dataframe(
+                kw_styled, width="stretch", hide_index=True,
+                column_config={
+                    "Revenue":   st.column_config.NumberColumn(format="$%.2f"),
+                    "Gasto":     st.column_config.NumberColumn(format="$%.2f"),
+                    "Profit":    st.column_config.NumberColumn(format="$%.2f"),
+                    "ROI":       st.column_config.NumberColumn(format="percent"),
+                    "Bid prom.": st.column_config.NumberColumn(format="$%.3f"),
+                },
+            )
+            st.caption("El ajuste de bid por keyword individual todavía no está disponible acá — lo estoy investigando (ver nota abajo).")
         else:
             st.caption("Sin datos de keywords para esta offer en el período seleccionado.")
     else:
