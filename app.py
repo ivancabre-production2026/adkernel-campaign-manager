@@ -451,39 +451,51 @@ if page == "Dashboard":
             reverse=True,
         )
 
+        base_bid = float(sel_offer.get("bid", 0.10))
+
         kw_rows = []
         kw_keys = []
+        kw_tiers = []
         for kw in kw_list_sorted:
-            perf    = kw_perf.get((kw.get("kwd", ""), kw.get("match_type", "")), {})
-            k_cost  = float(perf.get("adv_cost", 0))
-            k_convs = int(perf.get("adv_conversions", 0))
-            k_roi   = float(perf.get("adv_roi") if perf.get("adv_roi") is not None else (0 if k_cost == 0 else -100))
+            perf     = kw_perf.get((kw.get("kwd", ""), kw.get("match_type", "")), {})
+            k_cost   = float(perf.get("adv_cost", 0))
+            k_convs  = int(perf.get("adv_conversions", 0))
+            k_roi    = float(perf.get("adv_roi") if perf.get("adv_roi") is not None else (0 if k_cost == 0 else -100))
+            bid_adj  = float(kw.get("bid_adjustment", 1.0))
+            enabled  = bool(kw.get("enabled", True))
             kw_rows.append({
-                "Keyword":      kw.get("kwd", "—"),
-                "Match":        kw.get("match_type", "").upper(),
-                "Activa":       bool(kw.get("enabled", True)),
-                "Bid Adj. (%)": round(float(kw.get("bid_adjustment", 1.0)) * 100, 1),
-                "Clicks":       int(perf.get("adv_clicks", 0)),
-                "Gasto":        k_cost,
-                "Revenue":      float(perf.get("adv_value", 0)),
-                "Profit":       float(perf.get("adv_profit", 0)),
-                "ROI":          k_roi / 100,
+                "Keyword":         kw.get("kwd", "—"),
+                "Match":           kw.get("match_type", "").upper(),
+                "Activa":          enabled,
+                "Bid Adj. (%)":    round(bid_adj * 100, 1),
+                "Bid":             base_bid,
+                "Calculated Bid":  round(base_bid * bid_adj, 4),
+                "Clicks":          int(perf.get("adv_clicks", 0)),
+                "Gasto":           k_cost,
+                "Revenue":         float(perf.get("adv_value", 0)),
+                "Profit":          float(perf.get("adv_profit", 0)),
+                "ROI":             k_roi / 100,
             })
             kw_keys.append((kw.get("kwd", ""), kw.get("match_type", "")))
+            kw_tiers.append(roi_tier(k_roi, active=enabled, spent=k_cost > 1, converted=k_convs > 0))
 
         if kw_rows:
             kw_df = pd.DataFrame(kw_rows)
+            kw_styled = kw_df.style.apply(style_by_tier(kw_tiers), axis=1)
             st.data_editor(
-                kw_df, key="kw_editor", hide_index=True, width="stretch",
-                disabled=["Keyword", "Match", "Clicks", "Gasto", "Revenue", "Profit", "ROI"],
+                kw_styled, key="kw_editor", hide_index=True, width="stretch",
+                disabled=["Keyword", "Match", "Bid", "Calculated Bid", "Clicks", "Gasto", "Revenue", "Profit", "ROI"],
                 column_config={
-                    "Bid Adj. (%)": st.column_config.NumberColumn(min_value=10, max_value=500, step=5, format="%.1f%%"),
-                    "Gasto":        st.column_config.NumberColumn(format="$%.2f"),
-                    "Revenue":      st.column_config.NumberColumn(format="$%.2f"),
-                    "Profit":       st.column_config.NumberColumn(format="$%.2f"),
-                    "ROI":          st.column_config.NumberColumn(format="percent"),
+                    "Bid Adj. (%)":   st.column_config.NumberColumn(min_value=10, max_value=500, step=5, format="%.1f%%"),
+                    "Bid":            st.column_config.NumberColumn(format="$%.2f"),
+                    "Calculated Bid": st.column_config.NumberColumn(format="$%.4f"),
+                    "Gasto":          st.column_config.NumberColumn(format="$%.2f"),
+                    "Revenue":        st.column_config.NumberColumn(format="$%.2f"),
+                    "Profit":         st.column_config.NumberColumn(format="$%.2f"),
+                    "ROI":            st.column_config.NumberColumn(format="percent"),
                 },
             )
+            st.caption("Bid = CPC base de la offer · Calculated Bid = lo que realmente se paga por esa keyword (Bid × Bid Adj.)")
             edited_rows = st.session_state.get("kw_editor", {}).get("edited_rows", {})
             if edited_rows:
                 if st.button(f"Guardar {len(edited_rows)} cambio(s) de keyword", icon=":material/save:", type="primary", key="kw_save"):
