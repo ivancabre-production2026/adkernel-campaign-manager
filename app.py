@@ -195,9 +195,10 @@ def ak_get_offer_stats(_tok: str, date_param: str) -> dict:
 
 @st.cache_data(ttl=300, show_spinner=False)
 def ak_get_keyword_stats(_tok: str, date_param: str) -> dict:
-    """Devuelve {offer_id: [rows]} desde AdvertiserReports/offer,keyword2 (desglose por keyword/dominio dentro de cada offer)."""
+    """Devuelve {offer_id: [rows]} desde AdvertiserReports/offer,keyword2,match_type
+    (desglose por keyword + match type dentro de cada offer, igual que la pestaña Keywords de AdKernel)."""
     try:
-        r = requests.get(f"{AK_BASE}/admin/api/AdvertiserReports/offer,keyword2",
+        r = requests.get(f"{AK_BASE}/admin/api/AdvertiserReports/offer,keyword2,match_type",
             params={"version": AK_VERSION, "token": _tok,
                     "ad_campaign_id": AK_CAMPAIGN_ID,
                     "date": date_param, "limit": 2000},
@@ -438,19 +439,22 @@ if page == "Dashboard":
                     st.error(f"Error: {e}", icon=":material/error:")
 
         keyword_stats = ak_get_keyword_stats(tok, date_param)
-        kw_perf = {k.get("keyword2", ""): k for k in keyword_stats.get(sel_oid, [])}
+        kw_perf = {
+            (k.get("keyword2", ""), k.get("match_type", "")): k
+            for k in keyword_stats.get(sel_oid, [])
+        }
         kw_list = ak_get_offer_keywords(tok, sel_oid)
 
         kw_list_sorted = sorted(
             kw_list,
-            key=lambda k: float(kw_perf.get(k.get("kwd", ""), {}).get("adv_cost", 0)),
+            key=lambda k: float(kw_perf.get((k.get("kwd", ""), k.get("match_type", "")), {}).get("adv_cost", 0)),
             reverse=True,
         )
 
         kw_rows = []
         kw_keys = []
         for kw in kw_list_sorted:
-            perf    = kw_perf.get(kw.get("kwd", ""), {})
+            perf    = kw_perf.get((kw.get("kwd", ""), kw.get("match_type", "")), {})
             k_cost  = float(perf.get("adv_cost", 0))
             k_convs = int(perf.get("adv_conversions", 0))
             k_roi   = float(perf.get("adv_roi") if perf.get("adv_roi") is not None else (0 if k_cost == 0 else -100))
