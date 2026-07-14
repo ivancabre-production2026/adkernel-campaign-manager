@@ -216,6 +216,26 @@ def ak_get_keyword_stats(_tok: str, date_param: str) -> dict:
         return {}
 
 
+@st.cache_data(ttl=60, show_spinner=False)
+def ak_get_offer_keywords(_tok: str, offer_id: int) -> list[dict]:
+    """Lee las keywords (kwd + match_type + bid_adjustment) configuradas para una offer."""
+    r = requests.get(f"{AK_BASE}/admin/api/OfferNew/Keyword/{offer_id}",
+        params={"version": AK_VERSION, "token": _tok}, timeout=30)
+    data = r.json()
+    if data.get("status") != "OK":
+        return []
+    rows = data.get("response", {}).get("rows", {}).get(str(offer_id), {})
+    return list(rows.values())
+
+
+def ak_update_keyword_bids(tok: str, offer_id: int, edits: list[dict]) -> dict:
+    """Actualiza bid_adjustment (y/o enabled) de keywords puntuales. edits: [{kwd, match_type, bid_adjustment}, ...]."""
+    r = requests.put(f"{AK_BASE}/admin/api/OfferNew/Keyword/{offer_id}",
+        params={"version": AK_VERSION, "token": tok},
+        json={"mode": "UPDATE", "edit": edits}, timeout=30)
+    return r.json()
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # DASHBOARD
 # ══════════════════════════════════════════════════════════════════════════════
@@ -418,41 +438,73 @@ if page == "Dashboard":
                     st.error(f"Error: {e}", icon=":material/error:")
 
         keyword_stats = ak_get_keyword_stats(tok, date_param)
-        kw_rows_raw = sorted(keyword_stats.get(sel_oid, []), key=lambda x: float(x.get("adv_cost", 0)), reverse=True)
+        kw_perf = {k.get("keyword2", ""): k for k in keyword_stats.get(sel_oid, [])}
+        kw_list = ak_get_offer_keywords(tok, sel_oid)
+
+        kw_list_sorted = sorted(
+            kw_list,
+            key=lambda k: float(kw_perf.get(k.get("kwd", ""), {}).get("adv_cost", 0)),
+            reverse=True,
+        )
+
         kw_rows = []
-        kw_tiers = []
-        for k in kw_rows_raw:
-            k_cost  = float(k.get("adv_cost", 0))
-            k_convs = int(k.get("adv_conversions", 0))
-            k_roi   = float(k.get("adv_roi") if k.get("adv_roi") is not None else (0 if k_cost == 0 else -100))
+        kw_keys = []
+        for kw in kw_list_sorted:
+            perf    = kw_perf.get(kw.get("kwd", ""), {})
+            k_cost  = float(perf.get("adv_cost", 0))
+            k_convs = int(perf.get("adv_conversions", 0))
+            k_roi   = float(perf.get("adv_roi") if perf.get("adv_roi") is not None else (0 if k_cost == 0 else -100))
             kw_rows.append({
-                "Keyword":   k.get("keyword2", "—"),
-                "Clicks":    int(k.get("adv_clicks", 0)),
-                "Conv.":     k_convs,
-                "Revenue":   float(k.get("adv_value", 0)),
-                "Gasto":     k_cost,
-                "Profit":    float(k.get("adv_profit", 0)),
-                "ROI":       k_roi / 100,
-                "Bid prom.": float(k.get("adv_bids_avg") or 0),
+                "Keyword":      kw.get("kwd", "—"),
+                "Match":        kw.get("match_type", "").upper(),
+                "Activa":       bool(kw.get("enabled", True)),
+                "Bid Adj. (%)": round(float(kw.get("bid_adjustment", 1.0)) * 100, 1),
+                "Clicks":       int(perf.get("adv_clicks", 0)),
+                "Gasto":        k_cost,
+                "Revenue":      float(perf.get("adv_value", 0)),
+                "Profit":       float(perf.get("adv_profit", 0)),
+                "ROI":          k_roi / 100,
             })
-            kw_tiers.append(roi_tier(k_roi, spent=k_cost > 1, converted=k_convs > 0))
+            kw_keys.append((kw.get("kwd", ""), kw.get("match_type", "")))
 
         if kw_rows:
             kw_df = pd.DataFrame(kw_rows)
-            kw_styled = kw_df.style.apply(style_by_tier(kw_tiers), axis=1)
-            st.dataframe(
-                kw_styled, width="stretch", hide_index=True,
+            st.data_editor(
+                kw_df, key="kw_editor", hide_index=True, width="stretch",
+                disabled=["Keyword", "Match", "Clicks", "Gasto", "Revenue", "Profit", "ROI"],
                 column_config={
-                    "Revenue":   st.column_config.NumberColumn(format="$%.2f"),
-                    "Gasto":     st.column_config.NumberColumn(format="$%.2f"),
-                    "Profit":    st.column_config.NumberColumn(format="$%.2f"),
-                    "ROI":       st.column_config.NumberColumn(format="percent"),
-                    "Bid prom.": st.column_config.NumberColumn(format="$%.3f"),
+                    "Bid Adj. (%)": st.column_config.NumberColumn(min_value=10, max_value=500, step=5, format="%.1f%%"),
+                    "Gasto":        st.column_config.NumberColumn(format="$%.2f"),
+                    "Revenue":      st.column_config.NumberColumn(format="$%.2f"),
+                    "Profit":       st.column_config.NumberColumn(format="$%.2f"),
+                    "ROI":          st.column_config.NumberColumn(format="percent"),
                 },
             )
-            st.caption("El ajuste de bid por keyword individual todavía no está disponible acá — lo estoy investigando (ver nota abajo).")
+            edited_rows = st.session_state.get("kw_editor", {}).get("edited_rows", {})
+            if edited_rows:
+                if st.button(f"Guardar {len(edited_rows)} cambio(s) de keyword", icon=":material/save:", type="primary", key="kw_save"):
+                    edits = []
+                    for row_idx, changes in edited_rows.items():
+                        kwd, match_type = kw_keys[int(row_idx)]
+                        edit_body = {"kwd": kwd, "match_type": match_type}
+                        if "Bid Adj. (%)" in changes:
+                            edit_body["bid_adjustment"] = round(changes["Bid Adj. (%)"] / 100, 4)
+                        if "Activa" in changes:
+                            edit_body["enabled"] = changes["Activa"]
+                        edits.append(edit_body)
+                    try:
+                        result = ak_update_keyword_bids(tok, sel_oid, edits)
+                        if result.get("status") == "OK":
+                            st.success(f"{len(edits)} keyword(s) actualizadas.", icon=":material/check_circle:")
+                            st.cache_data.clear()
+                            time.sleep(0.8)
+                            st.rerun()
+                        else:
+                            st.error(str(result)[:300], icon=":material/error:")
+                    except Exception as e:
+                        st.error(f"Error: {e}", icon=":material/error:")
         else:
-            st.caption("Sin datos de keywords para esta offer en el período seleccionado.")
+            st.caption("Esta offer no tiene keywords configuradas.")
     else:
         st.caption("No hay offers con datos en este período.")
 
